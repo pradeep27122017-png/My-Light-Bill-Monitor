@@ -1,0 +1,118 @@
+{
+  "entities": {
+    "UserProfile": {
+      "title": "UserProfile",
+      "description": "Authenticated user profile document.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "description": "Firebase Auth UID of owner" },
+        "displayName": { "type": "string", "description": "User display name" },
+        "email": { "type": "string", "description": "User email address" },
+        "photoUrl": { "type": "string", "description": "User avatar URL" },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Server timestamp on create" },
+        "updatedAt": { "type": "string", "format": "date-time", "description": "Server timestamp on update" }
+      },
+      "required": ["userId", "displayName", "createdAt", "updatedAt"]
+    },
+    "UserSettings": {
+      "title": "UserSettings",
+      "description": "Per-user application preferences for theme and weather location.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "description": "Owner UID" },
+        "themeMode": { "type": "string", "enum": ["SYSTEM", "LIGHT", "DARK_NAVY"] },
+        "weatherAutoFetch": { "type": "boolean" },
+        "manualLocationName": { "type": "string" },
+        "manualLatitude": { "type": "number" },
+        "manualLongitude": { "type": "number" },
+        "defaultCurrency": { "type": "string" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "themeMode", "weatherAutoFetch", "defaultCurrency", "updatedAt"]
+    },
+    "MeterReading": {
+      "title": "MeterReading",
+      "description": "Electricity meter reading entry with EV charging status and weather snapshot.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "description": "Owner UID" },
+        "readingKwh": { "type": "number", "description": "Cumulative meter reading in kWh" },
+        "readingTimestampMs": { "type": "integer", "description": "User-selected reading date/time in epoch millis" },
+        "chargingStatus": { "type": "string", "enum": ["CHARGING", "NOT_CHARGING", "FULLY_CHARGED"] },
+        "meterReset": { "type": "boolean", "description": "Whether this entry marks a controlled meter reset or replacement" },
+        "previousMeterFinalKwh": { "type": "number", "description": "Final reading of previous meter before reset" },
+        "meterStartKwh": { "type": "number", "description": "Initial baseline of replacement meter" },
+        "weatherTempC": { "type": "number" },
+        "weatherCondition": { "type": "string" },
+        "weatherHumidity": { "type": "integer" },
+        "weatherWindKmh": { "type": "number" },
+        "weatherRainMm": { "type": "number" },
+        "weatherLocationName": { "type": "string" },
+        "remarks": { "type": "string" },
+        "edited": { "type": "boolean" },
+        "entryCreatedAt": { "type": "string", "format": "date-time", "description": "Server timestamp of original entry" },
+        "lastModifiedAt": { "type": "string", "format": "date-time", "description": "Server timestamp of last modification" }
+      },
+      "required": ["userId", "readingKwh", "readingTimestampMs", "chargingStatus", "meterReset", "edited", "entryCreatedAt", "lastModifiedAt"]
+    },
+    "TariffConfiguration": {
+      "title": "TariffConfiguration",
+      "description": "Versioned electricity tariff settings with effective date and optional slab tiers.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "name": { "type": "string" },
+        "currency": { "type": "string" },
+        "ratePerKwh": { "type": "number" },
+        "useTieredRates": { "type": "boolean" },
+        "tiers": { "type": "array", "description": "Up to 10 slab tier definitions" },
+        "fixedMonthlyCharge": { "type": "number" },
+        "otherCharges": { "type": "number" },
+        "effectiveFromEpochMs": { "type": "integer" },
+        "notes": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "name", "currency", "ratePerKwh", "useTieredRates", "tiers", "fixedMonthlyCharge", "otherCharges", "effectiveFromEpochMs", "createdAt", "updatedAt"]
+    },
+    "ReadingAuditLog": {
+      "title": "ReadingAuditLog",
+      "description": "Immutable audit record for reading creation, edit, delete, or meter reset.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "readingId": { "type": "string" },
+        "action": { "type": "string", "enum": ["CREATE", "UPDATE", "DELETE", "METER_RESET"] },
+        "previousReadingKwh": { "type": "number" },
+        "newReadingKwh": { "type": "number" },
+        "previousTimestampMs": { "type": "integer" },
+        "newTimestampMs": { "type": "integer" },
+        "reason": { "type": "string" },
+        "loggedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "readingId", "action", "reason", "loggedAt"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": { "$ref": "#/entities/UserProfile" },
+      "description": "Authenticated user profile"
+    },
+    "/users/{userId}/settings/{settingId}": {
+      "schema": { "$ref": "#/entities/UserSettings" },
+      "description": "User preferences (theme, currency, weather location)"
+    },
+    "/users/{userId}/readings/{readingId}": {
+      "schema": { "$ref": "#/entities/MeterReading" },
+      "description": "User electricity meter readings"
+    },
+    "/users/{userId}/tariffs/{tariffId}": {
+      "schema": { "$ref": "#/entities/TariffConfiguration" },
+      "description": "Historical and active tariff configurations"
+    },
+    "/users/{userId}/auditLogs/{logId}": {
+      "schema": { "$ref": "#/entities/ReadingAuditLog" },
+      "description": "Immutable reading modification audit log"
+    }
+  }
+}

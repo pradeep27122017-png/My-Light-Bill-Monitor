@@ -1,0 +1,6 @@
+{
+  "name": "Electricity Monitor",
+  "description": "Electricity monitoring, consumption analytics, tariff estimation, EV charging status, and weather snapshot tracking app.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

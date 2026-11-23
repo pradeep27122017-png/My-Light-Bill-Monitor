@@ -1,0 +1,219 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Global safety net: deny all by default
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() >= 1 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isValidUserProfile(data) {
+      return data.userId is string &&
+             data.userId == request.auth.uid &&
+             data.displayName is string &&
+             data.displayName.size() >= 1 &&
+             data.displayName.size() <= 100 &&
+             (!('email' in data) || (data.email is string && data.email.size() <= 200)) &&
+             (!('photoUrl' in data) || (data.photoUrl is string && data.photoUrl.size() <= 500));
+    }
+
+    function isValidUserSettings(data) {
+      return data.userId is string &&
+             data.userId == request.auth.uid &&
+             data.themeMode in ['SYSTEM', 'LIGHT', 'DARK_NAVY'] &&
+             data.weatherAutoFetch is bool &&
+             data.defaultCurrency is string &&
+             data.defaultCurrency.size() >= 1 &&
+             data.defaultCurrency.size() <= 10 &&
+             (!('manualLocationName' in data) || (data.manualLocationName is string && data.manualLocationName.size() <= 120)) &&
+             (!('manualLatitude' in data) || (data.manualLatitude is number && data.manualLatitude >= -90 && data.manualLatitude <= 90)) &&
+             (!('manualLongitude' in data) || (data.manualLongitude is number && data.manualLongitude >= -180 && data.manualLongitude <= 180));
+    }
+
+    function isValidMeterReading(data) {
+      return data.userId is string &&
+             data.userId == request.auth.uid &&
+             data.readingKwh is number &&
+             data.readingKwh >= 0 &&
+             data.readingKwh <= 10000000 &&
+             data.readingTimestampMs is int &&
+             data.readingTimestampMs > 0 &&
+             data.chargingStatus in ['CHARGING', 'NOT_CHARGING', 'FULLY_CHARGED'] &&
+             data.meterReset is bool &&
+             data.edited is bool &&
+             (!('previousMeterFinalKwh' in data) || (data.previousMeterFinalKwh is number && data.previousMeterFinalKwh >= 0 && data.previousMeterFinalKwh <= 10000000)) &&
+             (!('meterStartKwh' in data) || (data.meterStartKwh is number && data.meterStartKwh >= 0 && data.meterStartKwh <= 10000000)) &&
+             (!('weatherTempC' in data) || (data.weatherTempC is number && data.weatherTempC >= -90 && data.weatherTempC <= 70)) &&
+             (!('weatherCondition' in data) || (data.weatherCondition is string && data.weatherCondition.size() <= 80)) &&
+             (!('weatherHumidity' in data) || (data.weatherHumidity is int && data.weatherHumidity >= 0 && data.weatherHumidity <= 100)) &&
+             (!('weatherWindKmh' in data) || (data.weatherWindKmh is number && data.weatherWindKmh >= 0 && data.weatherWindKmh <= 500)) &&
+             (!('weatherRainMm' in data) || (data.weatherRainMm is number && data.weatherRainMm >= 0 && data.weatherRainMm <= 5000)) &&
+             (!('weatherLocationName' in data) || (data.weatherLocationName is string && data.weatherLocationName.size() <= 120)) &&
+             (!('remarks' in data) || (data.remarks is string && data.remarks.size() <= 500));
+    }
+
+    function isValidTariff(data) {
+      return data.userId is string &&
+             data.userId == request.auth.uid &&
+             data.name is string &&
+             data.name.size() >= 1 &&
+             data.name.size() <= 80 &&
+             data.currency is string &&
+             data.currency.size() >= 1 &&
+             data.currency.size() <= 10 &&
+             data.ratePerKwh is number &&
+             data.ratePerKwh >= 0 &&
+             data.ratePerKwh <= 100000 &&
+             data.useTieredRates is bool &&
+             data.tiers is list &&
+             data.tiers.size() <= 10 &&
+             (data.tiers.size() == 0 || data.tiers[0] is map) &&
+             data.fixedMonthlyCharge is number &&
+             data.fixedMonthlyCharge >= 0 &&
+             data.fixedMonthlyCharge <= 10000000 &&
+             data.otherCharges is number &&
+             data.otherCharges >= 0 &&
+             data.otherCharges <= 10000000 &&
+             data.effectiveFromEpochMs is int &&
+             data.effectiveFromEpochMs > 0 &&
+             (!('notes' in data) || (data.notes is string && data.notes.size() <= 300));
+    }
+
+    function isValidAuditLog(data) {
+      return data.userId is string &&
+             data.userId == request.auth.uid &&
+             data.readingId is string &&
+             data.readingId.size() >= 1 &&
+             data.readingId.size() <= 128 &&
+             data.action in ['CREATE', 'UPDATE', 'DELETE', 'METER_RESET'] &&
+             data.reason is string &&
+             data.reason.size() <= 300 &&
+             (!('previousReadingKwh' in data) || (data.previousReadingKwh is number && data.previousReadingKwh >= 0)) &&
+             (!('newReadingKwh' in data) || (data.newReadingKwh is number && data.newReadingKwh >= 0)) &&
+             (!('previousTimestampMs' in data) || (data.previousTimestampMs is int && data.previousTimestampMs >= 0)) &&
+             (!('newTimestampMs' in data) || (data.newTimestampMs is int && data.newTimestampMs >= 0));
+    }
+
+    match /users/{userId} {
+      allow get: if isOwner(userId) && isValidId(userId);
+      allow list: if false;
+      allow create: if isOwner(userId) &&
+                       isValidId(userId) &&
+                       incoming().keys().hasAll(['userId', 'displayName', 'createdAt', 'updatedAt']) &&
+                       incoming().keys().hasOnly(['userId', 'displayName', 'email', 'photoUrl', 'createdAt', 'updatedAt']) &&
+                       incoming().createdAt is timestamp &&
+                       incoming().createdAt <= request.time &&
+                       incoming().updatedAt is timestamp &&
+                       incoming().updatedAt <= request.time &&
+                       isValidUserProfile(incoming());
+      allow update: if isOwner(userId) &&
+                       isValidId(userId) &&
+                       isValidUserProfile(incoming()) &&
+                       incoming().userId == existing().userId &&
+                       incoming().createdAt == existing().createdAt &&
+                       incoming().updatedAt is timestamp &&
+                       incoming().updatedAt <= request.time &&
+                       incoming().diff(existing()).affectedKeys().hasOnly(['displayName', 'email', 'photoUrl', 'updatedAt']);
+      allow delete: if isOwner(userId) && isValidId(userId);
+
+      match /settings/{settingId} {
+        allow get: if isOwner(userId) && isValidId(settingId);
+        allow list: if isOwner(userId);
+        allow create: if isOwner(userId) &&
+                         isValidId(settingId) &&
+                         incoming().keys().hasAll(['userId', 'themeMode', 'weatherAutoFetch', 'defaultCurrency', 'updatedAt']) &&
+                         incoming().keys().hasOnly(['userId', 'themeMode', 'weatherAutoFetch', 'manualLocationName', 'manualLatitude', 'manualLongitude', 'defaultCurrency', 'updatedAt']) &&
+                         incoming().updatedAt is timestamp &&
+                         incoming().updatedAt <= request.time &&
+                         isValidUserSettings(incoming());
+        allow update: if isOwner(userId) &&
+                         isValidId(settingId) &&
+                         isValidUserSettings(incoming()) &&
+                         incoming().userId == existing().userId &&
+                         incoming().updatedAt is timestamp &&
+                         incoming().updatedAt <= request.time &&
+                         incoming().diff(existing()).affectedKeys().hasOnly(['themeMode', 'weatherAutoFetch', 'manualLocationName', 'manualLatitude', 'manualLongitude', 'defaultCurrency', 'updatedAt']);
+        allow delete: if isOwner(userId) && isValidId(settingId);
+      }
+
+      match /readings/{readingId} {
+        allow get: if isOwner(userId) && isValidId(readingId);
+        allow list: if isOwner(userId);
+        allow create: if isOwner(userId) &&
+                         isValidId(readingId) &&
+                         incoming().keys().hasAll(['userId', 'readingKwh', 'readingTimestampMs', 'chargingStatus', 'meterReset', 'edited', 'entryCreatedAt', 'lastModifiedAt']) &&
+                         incoming().keys().hasOnly(['userId', 'readingKwh', 'readingTimestampMs', 'chargingStatus', 'meterReset', 'previousMeterFinalKwh', 'meterStartKwh', 'weatherTempC', 'weatherCondition', 'weatherHumidity', 'weatherWindKmh', 'weatherRainMm', 'weatherLocationName', 'remarks', 'edited', 'entryCreatedAt', 'lastModifiedAt']) &&
+                         incoming().entryCreatedAt is timestamp &&
+                         incoming().entryCreatedAt <= request.time &&
+                         incoming().lastModifiedAt is timestamp &&
+                         incoming().lastModifiedAt <= request.time &&
+                         isValidMeterReading(incoming());
+        allow update: if isOwner(userId) &&
+                         isValidId(readingId) &&
+                         isValidMeterReading(incoming()) &&
+                         incoming().userId == existing().userId &&
+                         incoming().entryCreatedAt == existing().entryCreatedAt &&
+                         incoming().lastModifiedAt is timestamp &&
+                         incoming().lastModifiedAt <= request.time &&
+                         incoming().diff(existing()).affectedKeys().hasOnly(['readingKwh', 'readingTimestampMs', 'chargingStatus', 'meterReset', 'previousMeterFinalKwh', 'meterStartKwh', 'weatherTempC', 'weatherCondition', 'weatherHumidity', 'weatherWindKmh', 'weatherRainMm', 'weatherLocationName', 'remarks', 'edited', 'lastModifiedAt']);
+        allow delete: if isOwner(userId) && isValidId(readingId);
+      }
+
+      match /tariffs/{tariffId} {
+        allow get: if isOwner(userId) && isValidId(tariffId);
+        allow list: if isOwner(userId);
+        allow create: if isOwner(userId) &&
+                         isValidId(tariffId) &&
+                         incoming().keys().hasAll(['userId', 'name', 'currency', 'ratePerKwh', 'useTieredRates', 'tiers', 'fixedMonthlyCharge', 'otherCharges', 'effectiveFromEpochMs', 'createdAt', 'updatedAt']) &&
+                         incoming().keys().hasOnly(['userId', 'name', 'currency', 'ratePerKwh', 'useTieredRates', 'tiers', 'fixedMonthlyCharge', 'otherCharges', 'effectiveFromEpochMs', 'notes', 'createdAt', 'updatedAt']) &&
+                         incoming().createdAt is timestamp &&
+                         incoming().createdAt <= request.time &&
+                         incoming().updatedAt is timestamp &&
+                         incoming().updatedAt <= request.time &&
+                         isValidTariff(incoming());
+        allow update: if isOwner(userId) &&
+                         isValidId(tariffId) &&
+                         isValidTariff(incoming()) &&
+                         incoming().userId == existing().userId &&
+                         incoming().createdAt == existing().createdAt &&
+                         incoming().updatedAt is timestamp &&
+                         incoming().updatedAt <= request.time &&
+                         incoming().diff(existing()).affectedKeys().hasOnly(['name', 'currency', 'ratePerKwh', 'useTieredRates', 'tiers', 'fixedMonthlyCharge', 'otherCharges', 'effectiveFromEpochMs', 'notes', 'updatedAt']);
+        allow delete: if isOwner(userId) && isValidId(tariffId);
+      }
+
+      match /auditLogs/{logId} {
+        allow get: if isOwner(userId) && isValidId(logId);
+        allow list: if isOwner(userId);
+        allow create: if isOwner(userId) &&
+                         isValidId(logId) &&
+                         incoming().keys().hasAll(['userId', 'readingId', 'action', 'reason', 'loggedAt']) &&
+                         incoming().keys().hasOnly(['userId', 'readingId', 'action', 'previousReadingKwh', 'newReadingKwh', 'previousTimestampMs', 'newTimestampMs', 'reason', 'loggedAt']) &&
+                         incoming().loggedAt is timestamp &&
+                         incoming().loggedAt <= request.time &&
+                         isValidAuditLog(incoming());
+        allow update, delete: if false;
+      }
+    }
+  }
+}

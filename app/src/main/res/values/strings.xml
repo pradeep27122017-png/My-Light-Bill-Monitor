@@ -1,0 +1,13 @@
+<resources>
+    <string name="app_name">Electricity Monitor</string>
+    <string name="tagline_subtitle">Smart meter tracking, tariff estimation &amp; energy analytics</string>
+    <string name="sign_in_with_google">Sign in with Google</string>
+    <string name="nav_dashboard">Dashboard</string>
+    <string name="nav_add_reading">Add Reading</string>
+    <string name="nav_analysis">Analysis</string>
+    <string name="nav_history">History</string>
+    <string name="nav_settings">Settings</string>
+    <string name="estimate_disclaimer">Estimated cost based on your configured tariff. Actual utility bills may include additional taxes, fuel adjustments, or regulatory charges.</string>
+    <string name="ev_future_note">Charging status is saved per meter reading. Dedicated EV sub-meter kWh tracking is planned for a future release.</string>
+    <string name="tariff_not_configured">No tariff configured yet. Add your LKR rate or slabs in Settings to calculate estimated costs.</string>
+</resources>
